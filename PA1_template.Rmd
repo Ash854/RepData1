@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=TRUE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::include_graphics(path = "~/Documents/Coursera/Project")
 ```
 
 
