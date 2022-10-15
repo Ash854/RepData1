@@ -1,0 +1,176 @@
+---
+title: "Reproducible Research Project 1"
+author: "Aisling O'Connor"
+date: "2022-09-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Reproducible Research - Project 1
+
+Data is recorded through a personal activity monitoring device which is collected every 5 mins throughout the day. The dataset has two months of data (Oct and Nov 2012) from an anonymous individual and details the number of steps taken in 5 minute intervals per day.
+
+To access location of dataset follow the link below:
+
+Dataset: [Activity monitoring data](https://github.com/rdpeng/RepData_PeerAssessment1/raw/master/activity.zip) [52K]
+
+Dataset variables:
+
+-   **steps**: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+
+-   **date**: The date on which the measurement was taken in YYYY-MM-DD format
+
+-   **interval**: Identifier for the 5-minute interval in which measurement was taken
+
+## What is mean total number of steps taken per day?
+
+### 1. Calculate the total number of steps taken per day
+
+```{r, echo=TRUE}
+download.file("https://github.com/Ash854/RepData_PeerAssessment1/blob/master/activity.zip", "activity.zip")
+wd <- getwd()
+unzip(wd, files = NULL, list = FALSE, overwrite = TRUE, exdir = "wd", unzip = getOption("unzip"))
+
+activitydata <- read.csv("activity.csv")
+
+## Process/transform the data (if necessary) into a format suitable for your analysis
+## You can ignore the missing values in the dataset.
+
+activitydata$date <- as.Date(strptime(activitydata$date, format="%Y-%m-%d"))
+
+##Calculate the total number of steps taken per day
+
+PerDay <- aggregate(steps ~ date, activitydata, sum, na.rm=TRUE)
+
+```
+
+### 2. Make a histogram of the total number of steps taken each day
+
+```{r simulation, echo=TRUE}
+hist(PerDay$steps, xlab = "Steps", main = "Total No Steps Per Day")
+```
+
+### 3. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r, echo=TRUE}
+meanPerDay <- mean(PerDay$steps)
+meanPerDay
+
+medianPerDay <- median(PerDay$steps)
+medianPerDay
+```
+
+## What is the average daily activity pattern?
+
+### 1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r scatterplot, fig.height = 4, echo=TRUE}
+Per5MinInterval<-aggregate(steps~interval, data=activitydata, mean, na.rm=TRUE)
+plot(steps~interval, data=Per5MinInterval, type="l")
+```
+
+### 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r, echo=TRUE}
+MaxStepInterval <- Per5MinInterval[which.max(Per5MinInterval$steps),]$interval
+MaxStepInterval
+```
+
+## Imputing missing values
+
+### 1. Calculate and report the total number of missing values in the dataset.
+
+```{r, echo=TRUE}
+totalMissingValues <- sum(is.na(activitydata$steps))
+totalMissingValues
+```
+
+### 2. Devise a strategy for filling in all of the missing values in the dataset.
+
+```{r, echo=TRUE}
+library(plyr)
+library(dplyr)
+library(Hmisc)
+
+imputeddata = ddply(activitydata, "interval", mutate,
+                         imputed.steps = impute(steps, mean))
+```
+
+### 3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r, echo=TRUE}
+orderedimputeddata=imputeddata[order(imputeddata[,2], decreasing=FALSE) ,]
+impdata=orderedimputeddata[,c(4,2,3)]
+impdata$imputed.steps=as.integer(imputeddata$imputed.steps)
+detach("package:Hmisc")
+```
+
+### 4. Make a histogram of the total number of steps taken each day
+
+```{r, echo=TRUE}
+imputeddailytotal=ddply(impdata,"date", summarize, sum=sum(imputed.steps))
+
+hist(imputeddailytotal$sum, xlab= "Daily Total Steps", main = "Daily Step Frequency")
+```
+
+#### Calculate and report the mean and median total number of steps taken per day.
+
+```{r, echo=TRUE}
+meanPerDayImputed <- mean(imputeddailytotal$sum,na.rm=TRUE)
+meanPerDayImputed
+
+medianPerDayImputed <- median(imputeddailytotal$sum, na.rm=TRUE)
+medianPerDayImputed
+```
+
+#### Do these values differ from the estimates from the first part of the assignment?
+
+```{r, echo=TRUE}
+MeanDifference <- meanPerDay - meanPerDayImputed
+MeanDifference 
+
+MedianDifference <- medianPerDay - medianPerDayImputed
+MedianDifference
+```
+
+#### What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+There's a reduction in both mean and median through imputing missing data to estimates of the total daily number of steps. The median is affected to a higher degree of difference than the mean'}
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+### 1. Create a new factor variable in the dataset with two levels -- "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+
+```{r, echo=TRUE}
+impdata$dayType <- sapply(impdata$date, function(x) {
+  if(weekdays(x) == "Saturday" | weekdays(x) == "Sunday")
+  {y <- "Weekend"}
+  else {y <- "Weekday"}
+  y
+})
+```
+
+### 2. Make a panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r, echo=TRUE}
+
+library(lubridate)
+
+avgstepsimp <- impdata %>% select(-date) %>%
+  group_by(interval, dayType) %>%
+  summarise(
+    imputed.steps = mean(imputed.steps)
+  )
+
+library(ggplot2)
+
+ggplot(avgstepsimp, aes(interval, imputed.steps, color = dayType)) + ylim(0,100) +
+  geom_line() + 
+  facet_wrap(~dayType, nrow = 2) +
+  xlab("5-Minute intervals") + 
+  ylab("Average number of steps") +
+  scale_color_discrete(name = "Day Type")
+```
